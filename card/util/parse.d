@@ -24,7 +24,9 @@ alias OutputType(P, I) =
 private
 struct Succeed(O)
 {
+    private
     O value;
+
     inout(Result!O) parse(I)(ref const(I)) inout
     {
         return Result!O(value);
@@ -196,6 +198,7 @@ unittest
 private
 struct All(Ps...)
 {
+    private
     Tuple!Ps parsers;
 
     template parse(I)
@@ -259,6 +262,7 @@ unittest
 private
 struct Backtrack(P)
 {
+    private
     P parser;
 
     template parse(I)
