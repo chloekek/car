@@ -6,6 +6,7 @@ import std.format : format;
 import std.functional : unaryFun;
 import std.meta : staticMap;
 import std.range : ElementType, isForwardRange, iota, isInputRange;
+import std.traits : lvalueOf, rvalueOf;
 import std.typecons : Nullable, Tuple, tuple;
 
 /+ -------------------------------------------------------------------------- +/
@@ -13,11 +14,7 @@ import std.typecons : Nullable, Tuple, tuple;
 alias Result = Nullable;
 
 alias OutputType(P, I) =
-    typeof({
-        P p;
-        I i;
-        return p.parse(i).get;
-    }());
+    typeof(rvalueOf!P.parse(lvalueOf!I).get);
 
 /+ -------------------------------------------------------------------------- +/
 
