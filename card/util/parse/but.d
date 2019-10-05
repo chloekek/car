@@ -5,6 +5,7 @@ import card.util.parse.fail : fail;
 import card.util.parse.token : token;
 
 import std.functional : unaryFun;
+import std.traits : rvalueOf;
 
 import ascii = std.ascii;
 
@@ -20,7 +21,7 @@ struct But(alias F, P)
     template parse(I)
     {
         private
-        alias O = OutputType!(P, I);
+        alias O = typeof(f(rvalueOf!(OutputType!(P, I))));
 
         Result!O parse(ref I i) const
         {
