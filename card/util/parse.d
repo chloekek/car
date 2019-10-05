@@ -1,13 +1,23 @@
 module card.util.parse;
 
-import std.array : empty, front, popFront;
+import std.algorithm : map;
+import std.array : empty, front, join, popFront, save;
+import std.format : format;
 import std.functional : unaryFun;
-import std.range : ElementType, isInputRange;
-import std.typecons : Nullable;
+import std.meta : staticMap;
+import std.range : ElementType, isForwardRange, iota, isInputRange;
+import std.typecons : Nullable, Tuple, tuple;
 
 /+ -------------------------------------------------------------------------- +/
 
 alias Result = Nullable;
+
+alias OutputType(P, I) =
+    typeof({
+        P p;
+        I i;
+        return p.parse(i).get;
+    }());
 
 /+ -------------------------------------------------------------------------- +/
 
@@ -179,4 +189,123 @@ unittest
     assert (!result.isNull);
     assert (result.get == 'f');
     assert (input == "oo"d);
+}
+
+/+ -------------------------------------------------------------------------- +/
+
+private
+struct All(Ps...)
+{
+    Tuple!Ps parsers;
+
+    template parse(I)
+    {
+        private
+        {
+            alias O = Tuple!(staticMap!(OF, Ps));
+            alias OF(P) = OutputType!(P, I);
+        }
+
+        Result!O parse(ref I i) const
+        {
+            static foreach (j; 0 .. Ps.length)
+                mixin(
+                    format!`
+                        auto r%d = parsers[%d].parse(i);
+                        if (r%d.isNull)
+                            return Result!O();
+                    `(j, j, j)
+                );
+            enum rs = iota(Ps.length).map!`format!"r%d.get"(a)`;
+            return Result!O(mixin(`tuple(` ~ rs.join(`, `) ~ `)`));
+        }
+    }
+}
+
+/// Return a parser which succeeds iff all given parsers succeed, by applying
+/// them in order and returning a tuple with the results.
+auto all(Ps...)(Ps parsers)
+{
+    return All!Ps(tuple(parsers));
+}
+
+///
+nothrow pure @nogc @safe
+unittest
+{
+    const parser = all(token, token, token);
+    auto  input  = "fo"d;
+    const result = parser.parse(input);
+
+    assert (result.isNull);
+    assert (input == ""d);
+}
+
+///
+nothrow pure @nogc @safe
+unittest
+{
+    const parser = all(token, token, token);
+    auto  input  = "foo"d;
+    const result = parser.parse(input);
+
+    assert (!result.isNull);
+    assert (result.get == tuple('f', 'o', 'o'));
+    assert (input == ""d);
+}
+
+/+ -------------------------------------------------------------------------- +/
+
+private
+struct Backtrack(P)
+{
+    P parser;
+
+    template parse(I)
+        if (isForwardRange!I)
+    {
+        private
+        alias O = OutputType!(P, I);
+
+        Result!O parse(ref I i) const
+        {
+            auto j = i.save;
+            auto r = parser.parse(j);
+            if (!r.isNull)
+                i = j;
+            return r;
+        }
+    }
+}
+
+/// Return a parser that backtracks if the given parser fails. The result of the
+/// given parser is returned regardless.
+auto backtrack(P)(P parser)
+{
+    return Backtrack!P(parser);
+}
+
+///
+nothrow pure @nogc @safe
+unittest
+{
+    const parser = backtrack(all(token, token, token));
+    auto  input  = "fo"d;
+    const result = parser.parse(input);
+
+    assert (result.isNull);
+    assert (input == "fo"d);
+}
+
+///
+nothrow pure @nogc @safe
+unittest
+{
+    const parser = backtrack(all(token, token, token));
+    auto  input  = "foo"d;
+    const result = parser.parse(input);
+
+    assert (!result.isNull);
+    assert (result.get == tuple('f', 'o', 'o'));
+    assert (input == ""d);
 }
